@@ -4,7 +4,7 @@
 // 1) API_URL: la URL que te da Google Apps Script
 //    al desplegar como "Web app" (termina en /exec)
 // ============================================
-var API_URL = 'https://script.google.com/macros/s/AKfycbwzruuuegP8I12a9Z_q4D2Nv1n1VJ-9iXMnCUDjJJLdSwRl6VvITbBgfnRAB7mY2MJU/exec'
+var API_URL = 'https://script.google.com/macros/s/AKfycbyt9a4EU5oJeT3VS8Hb9YYVZHR_ltN1I_4dXzzbYqilqQu5ZQ5KqWYByGXeuY88TCRi/exec'
 
 // Telefono de WhatsApp (con codigo de pais, sin +, sin espacios)
 var WPP_ADMIN = '5491164673729';
