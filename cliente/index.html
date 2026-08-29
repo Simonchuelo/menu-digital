@@ -50,7 +50,7 @@
 <body>
 <header>
   <h1>Polybius</h1>
-  <p> Elegí, pagá y retirá. ¡Gracias!</p>
+  <p>Escaneá el QR, elegí y pedi. ¡Gracias!</p>
 </header>
 
 <div class="nav" id="nav"></div>
@@ -130,7 +130,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function apiGet(query) {
   if (!API_URL) throw new Error('API_URL vacía');
-  const res = await fetch(API_URL + (API_URL.indexOf('?')>=0?'&':'?') + query);
+  const sep = API_URL.indexOf('?')>=0 ? '&' : '?';
+  const res = await fetch(API_URL + sep + query + '&t=' + Date.now());
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || 'error API');
   return json;

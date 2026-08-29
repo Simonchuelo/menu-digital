@@ -231,11 +231,11 @@ function cardHTML(p) {
   const lista = items.map(i=>`<li>${i.cantidad}× ${i.nombre}</li>`).join('');
   const esPend = p.estado==='pendiente'||p.estado==='en_preparacion';
   const detalle = items.map(i=>`${i.cantidad}x ${i.nombre}`).join('\n');
-  const msg = `*Nuevo pedido N°${p.numero}*%0A${p.nombre?('*Cliente:* '+p.nombre+'%0A'):''}%0A${detalle}%0A%0A*Total:* ${fmt(p.total)}%0A*Pago:* ${p.pago_metodo}${p.pago_captura?('%0A*Captura:* '+p.pago_captura):''}`;
+  const msg = `*Nuevo pedido N°${p.id}*%0A${p.nombre?('*Cliente:* '+p.nombre+'%0A'):''}%0A${detalle}%0A%0A*Total:* ${fmt(p.total)}%0A*Pago:* ${p.pago_metodo}${p.pago_captura?('%0A*Captura:* '+p.pago_captura):''}`;
   const wpp = `https://wa.me/${WPP_ADMIN}?text=${msg}`;
   return `
   <div class="card ${p.estado}">
-    <div class="card-head"><span class="numero">Pedido N°${p.numero}</span><span class="hora">${p.creado_en||''}</span></div>
+    <div class="card-head"><span class="numero">Pedido N°${p.id}</span><span class="hora">${p.creado_en||''}</span></div>
     <div class="cliente">${p.nombre ? '<b>'+p.nombre+'</b> · ' : ''}${p.telefono ? '<a href="https://wa.me/'+p.telefono.replace(/\D/g,'')+'">Tel</a>' : ''}</div>
     <div class="items"><ul>${lista}</ul></div>
     <div class="total">Total: ${fmt(p.total)}</div>

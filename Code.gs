@@ -44,6 +44,8 @@ function doPost(e) {
       out.data = crearPedido(body);
     } else if (accion === 'estado_pedido') {
       out.data = cambiarEstadoPedido(body);
+    } else if (accion === 'cancelar_pedido') {
+      out.data = cancelarPedido(body);
     } else if (accion === 'guardar_producto') {
       out.data = guardarProducto(body);
     } else if (accion === 'borrar_producto') {
@@ -52,6 +54,8 @@ function doPost(e) {
       out.data = agregarCategoria(body);
     } else if (accion === 'borrar_categoria') {
       out.data = borrarCategoria(body);
+    } else if (accion === 'guardar_config') {
+      out.data = guardarConfig(body);
     } else {
       out.ok = false; out.error = 'accion desconocida';
     }
@@ -153,18 +157,6 @@ function leerPedidos(estado) {
   return out;
 }
 
-function proximoNumero() {
-  var sh = ss().getSheetByName(HOJA_PEDIDOS);
-  var data = sh.getDataRange().getValues();
-  var hoy = fechaLocal();
-  var max = 0;
-  for (var i = 1; i < data.length; i++) {
-    var creado = String(data[i][11]);
-    if (creado && creado.indexOf(hoy) === 0 && Number(data[i][1]) > max) max = Number(data[i][1]);
-  }
-  return max + 1;
-}
-
 function fechaLocal() {
   return Utilities.formatDate(new Date(), ss().getSpreadsheetTimeZone(), 'yyyy-MM-dd HH:mm:ss');
 }
@@ -172,8 +164,9 @@ function fechaLocal() {
 function crearPedido(b) {
   asegurarPlanilla();
   var sh = ss().getSheetByName(HOJA_PEDIDOS);
-  var numero = proximoNumero();
+  // El numero de pedido usa el id global incremental (nunca se reinicia y siempre sube)
   var id = proximoIdPedidos();
+  var numero = id;
   sh.appendRow([ id, numero, b.nombre || '', b.telefono || '', JSON.stringify(b.items || []), Number(b.total) || 0, b.nota || '', b.pago_metodo || '', b.pago_captura || '', b.pago_confirmado ? 1 : 0, 'pendiente', fechaLocal() ]);
   return { id: id, numero: numero };
 }
@@ -200,30 +193,90 @@ function cambiarEstadoPedido(b) {
   return { ok: false, error: 'no existe' };
 }
 
+// Cancelacion desde el cliente: solo si el pedido sigue 'pendiente'
+function cancelarPedido(b) {
+  asegurarPlanilla();
+  var sh = ss().getSheetByName(HOJA_PEDIDOS);
+  var data = sh.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (Number(data[i][0]) === Number(b.id)) {
+      var estado = data[i][10];
+      if (estado === 'pendiente') {
+        sh.getRange(i+1, 11).setValue('cancelado');
+        return { ok: true };
+      }
+      return { ok: false, error: 'El pedido ya no se puede cancelar' };
+    }
+  }
+  return { ok: false, error: 'no existe' };
+}
+
 // ---------- CONFIG ----------
+function guardarConfig(b) {
+  asegurarPlanilla();
+  var sh = ss().getSheetByName(HOJA_CONFIG);
+  var data = sh.getDataRange().getValues();
+  var filaNeg = null, filaWpp = null;
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] === 'negocio') filaNeg = i + 1;
+    if (data[i][0] === 'wppAdmin') filaWpp = i + 1;
+  }
+  if (b.negocio) {
+    if (filaNeg) sh.getRange(filaNeg, 2).setValue(b.negocio);
+    else sh.appendRow(['negocio', b.negocio]);
+  }
+  if (b.wppAdmin) {
+    if (filaWpp) sh.getRange(filaWpp, 2).setValue(b.wppAdmin);
+    else sh.appendRow(['wppAdmin', b.wppAdmin]);
+  }
+  return leerConfig();
+}
+
 function leerConfig() {
   asegurarPlanilla();
   var sh = ss().getSheetByName(HOJA_CONFIG);
   var data = sh.getDataRange().getValues();
-  var cfg = { negocio: 'Mi Negocio', wppAdmin: '' };
+  var cfg = { negocio: 'Polybius', wppAdmin: '' };
   for (var i = 1; i < data.length; i++) {
     if (data[i][0] === 'negocio') cfg.negocio = data[i][1];
     if (data[i][0] === 'wppAdmin') cfg.wppAdmin = data[i][1];
   }
   if (!cfg.wppAdmin) { sh.appendRow(['wppAdmin','']); }
-  if (!cfg.negocio) { sh.appendRow(['negocio','Mi Negocio']); }
+  if (!cfg.negocio) { sh.appendRow(['negocio','Polybius']); }
   return cfg;
 }
 
 // ---------- RESUMEN DE VENTAS ----------
+// Convierte cualquier valor (string "yyyy-MM-dd..." o Date) a "yyyy-MM-dd"
+function soloFecha(v) {
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, ss().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
+  }
+  return String(v).slice(0, 10);
+}
+
 function resumenVentas(e) {
   var sh = ss().getSheetByName(HOJA_PEDIDOS);
   var data = sh.getDataRange().getValues();
-  var hoy = fechaLocal().slice(0,10);
-  var desde, hasta;
-  if (e.fecha) { desde = e.fecha; hasta = e.fecha; }
-  else if (e.desde && e.hasta) { desde = e.desde; hasta = e.hasta; }
-  else { desde = hoy; hasta = hoy; }
+
+  function fecParam(k) { return e && e[k] ? String(e[k]).slice(0,10) : ''; }
+
+  var dias = [];
+  if (e && e.fecha) { dias = [fecParam('fecha')]; }
+  else if (e && e.desde && e.hasta) {
+    // agrego cada dia del rango para comparar exacto (uso aritmetica de millis en base a string)
+    var des = fecParam('desde'), has = fecParam('hasta');
+    var d = new Date(des + 'T12:00:00'); // mediodia evita desfases de zona
+    var h = new Date(has + 'T12:00:00');
+    while (d <= h) {
+      dias.push(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'));
+      d.setDate(d.getDate() + 1);
+    }
+  } else {
+    dias = [Utilities.formatDate(new Date(), ss().getSpreadsheetTimeZone(), 'yyyy-MM-dd')];
+  }
+  var setDias = {};
+  dias.forEach(function(x){ setDias[x] = true; });
 
   var totalGeneral = 0, totalPagar = 0, totalSinPagar = 0, pedidosTotales = 0, itemsVendidos = 0;
   var porMetodo = {}, porProducto = {};
@@ -231,8 +284,8 @@ function resumenVentas(e) {
   for (var i = 1; i < data.length; i++) {
     var r = data[i];
     if (r[10] !== 'entregado') continue;
-    var fecha = String(r[11]).slice(0,10);
-    if (fecha < desde || fecha > hasta) continue;
+    var f = soloFecha(r[11]);
+    if (!setDias[f]) continue;
     pedidosTotales++;
     totalGeneral += Number(r[5]) || 0;
     if (r[9]) totalPagar += Number(r[5]) || 0; else totalSinPagar += Number(r[5]) || 0;
