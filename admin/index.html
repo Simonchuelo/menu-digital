@@ -57,6 +57,7 @@
     <button id="tab-entregados" onclick="mostrarTab('entregados')">Entregados<span class="count" id="count-entregados">0</span></button>
     <button id="tab-menu" onclick="mostrarTab('menu')">Menú</button>
     <button id="tab-ventas" onclick="mostrarTab('ventas')">📊 Ventas</button>
+    <button id="tab-config" onclick="mostrarTab('config')">⚙️ Config</button>
   </div>
 </header>
 
@@ -75,6 +76,19 @@
     <button class="btn-editar" style="background:#1f6feb" onclick="cargarVentas('rango')">Mostrar rango</button>
   </div>
   <div id="ventas-contenido"></div>
+</div>
+
+<div class="admin-tab" id="tab-config-panel">
+  <h2 style="margin-bottom:16px">Configuración</h2>
+  <div style="background:#fff;border-radius:12px;padding:20px;max-width:480px">
+    <label>Nombre del negocio (se muestra en el menú del cliente)</label>
+    <input id="cfg-negocio" placeholder="Ej: Polybius">
+    <label>WhatsApp para recibir avisos (con código de país, sin +)</label>
+    <input id="cfg-wpp" placeholder="Ej: 5491164673729">
+    <button class="btn" style="width:auto;padding:11px 22px;margin-top:18px;background:#27ae60" onclick="guardarConfigAdmin()">Guardar configuración</button>
+    <div id="cfg-msj" style="font-size:13px;color:#27ae60;margin-top:10px"></div>
+    <p class="nota" style="font-size:12px;color:#888;margin-top:14px">También podés editar estos valores directo en la pestaña "Config" de tu Google Sheet.</p>
+  </div>
 </div>
 
 <div class="admin-tab" id="tab-menu-panel">
@@ -115,7 +129,8 @@ let menuData = [];
 let editandoId = null;
 let ultimoIdMax = 0;
 let sonidoActivado = false;
-let negocio = 'Mi Negocio';
+let negocio = 'Polybius';
+let cfgData = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   if (!API_URL) {
@@ -126,7 +141,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('click', () => { sonidoActivado = true; }, { once: true });
   try {
     const cfg = await apiGet('accion=config');
-    if (cfg.data && cfg.data.negocio) negocio = cfg.data.negocio;
+    cfgData = cfg.data;
+    if (cfgData && cfgData.negocio) negocio = cfgData.negocio;
+    llenarConfigForm();
   } catch(e) {}
   cargarDatos();
   setInterval(cargarDatos, 12000);
@@ -134,7 +151,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function apiGet(query) {
-  const res = await fetch(API_URL + (API_URL.indexOf('?')>=0?'&':'?') + query);
+  const sep = API_URL.indexOf('?')>=0 ? '&' : '?';
+  // parametro anti-cache para evitar que Apps Script devuelva datos viejos
+  const res = await fetch(API_URL + sep + query + '&t=' + Date.now());
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || 'error API');
   return json;
@@ -182,8 +201,22 @@ function mostrarTab(tab) {
   document.getElementById('grid-entregados').style.display = tab==='entregados'?'grid':'none';
   document.getElementById('tab-menu-panel').classList.toggle('show', tab==='menu');
   document.getElementById('tab-ventas-panel').classList.toggle('show', tab==='ventas');
+  document.getElementById('tab-config-panel').classList.toggle('show', tab==='config');
   if (tab==='ventas') cargarVentas('hoy');
   if (tab==='menu') cargarAdminMenu();
+}
+
+function llenarConfigForm() {
+  document.getElementById('cfg-negocio').value = (cfgData && cfgData.negocio) || negocio;
+  document.getElementById('cfg-wpp').value = (cfgData && cfgData.wppAdmin) || WPP_ADMIN;
+}
+async function guardarConfigAdmin() {
+  const n = document.getElementById('cfg-negocio').value.trim();
+  const w = document.getElementById('cfg-wpp').value.trim();
+  const r = await apiPost({ accion: 'guardar_config', negocio: n, wppAdmin: w });
+  cfgData = r.data;
+  document.getElementById('cfg-msj').textContent = '✔ Guardado. El nombre se actualizará en el menú del cliente.';
+  setTimeout(()=>{ document.getElementById('cfg-msj').textContent=''; }, 4000);
 }
 function actualizarContadores() {
   const nP = pedidos.filter(p=>p.estado==='pendiente'||p.estado==='en_preparacion').length;
@@ -228,20 +261,25 @@ function renderEntregados() {
   const l = pedidos.filter(p=>p.estado==='entregado'||p.estado==='cancelado').sort((a,b)=>b.id-a.id);
   cont.innerHTML = l.length ? l.map(cardHTML).join('') : '<div class="vacio">Aún no hay entregados</div>';
 }
-async function cambiarEstado(id, estado) {
-  await apiPost({ accion:'estado_pedido', id, estado });
-  cargarDatos();
+// Actualizacion optimista: la UI cambia al instante, el guardado va en 2do plano
+function cambiarEstado(id, estado) {
+  const ped = pedidos.find(x=>x.id==id);
+  if (ped) { ped.estado = estado; renderPendientes(); renderEntregados(); actualizarContadores(); }
+  apiPost({ accion:'estado_pedido', id, estado }).catch(()=>{});
 }
-async function togglePago(id, val) {
-  await apiPost({ accion:'estado_pedido', id, pago_confirmado: val });
-  cargarDatos();
+function togglePago(id, val) {
+  const ped = pedidos.find(x=>x.id==id);
+  if (ped) { ped.pago_confirmado = val; renderPendientes(); renderEntregados(); }
+  apiPost({ accion:'estado_pedido', id, pago_confirmado: val }).catch(()=>{});
 }
 
 // ---------- Ventas ----------
 function cargarVentas(modo) {
-  const d = new Date(); const fmtD = x => x.toISOString().slice(0,10);
+  const d = new Date();
+  const fmtD = x => x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
   let q = 'accion=resumen';
-  if (modo==='ayer') { const a=new Date(d); a.setDate(d.getDate()-1); q += '&fecha='+fmtD(a); }
+  if (modo==='hoy') { q += '&fecha='+fmtD(d); }
+  else if (modo==='ayer') { const a=new Date(d); a.setDate(d.getDate()-1); q += '&fecha='+fmtD(a); }
   else if (modo==='rango') { q += '&desde='+(document.getElementById('desde-venta').value||fmtD(d))+'&hasta='+(document.getElementById('hasta-venta').value||fmtD(d)); }
   apiGet(q).then(r=>renderVentas(r.data));
 }
@@ -249,7 +287,15 @@ function renderVentas(v) {
   const cont = document.getElementById('ventas-contenido');
   const porMetodo = (v.porMetodo||[]).map(m=>`<div style="display:flex;justify-content:space-between;border-bottom:1px dashed #eee;padding:6px 0"><span>${m.metodo}</span><b>${fmt(m.monto)}</b></div>`).join('');
   const prods = (v.porProducto||[]).map(p=>`<div style="display:flex;justify-content:space-between;border-bottom:1px dashed #eee;padding:6px 0"><span>${p.nombre} × ${p.cantidad}</span><b>${fmt(p.monto)}</b></div>`).join('')||'<div class="vacio">Sin ventas</div>';
+  let aviso = '';
+  if (v.pedidosTotales === 0) {
+    aviso = `<div style="background:#fff3cd;border:1px solid #ffe08a;color:#856404;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px">
+      El total del día es 0. El resumen solo cuenta pedidos marcados como <b>ENTREGADO</b> en la pestaña Pedidos de la planilla.
+      Marcá un pedido como "Entregado" (botón ✓) y volvé a esta pestaña. También revisá que el <b>filtro de fecha</b> sea el correcto.
+    </div>`;
+  }
   cont.innerHTML = `
+    ${aviso}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px">
       <div style="background:#1f2a1f;color:#fff;border-radius:12px;padding:18px;text-align:center"><div style="font-size:12px;opacity:.7">Total vendido</div><div style="font-size:26px;font-weight:800">${fmt(v.totalGeneral)}</div><div style="font-size:12px">${v.pedidosTotales} pedidos · ${v.itemsVendidos} ítems</div></div>
       <div style="background:#27ae60;color:#fff;border-radius:12px;padding:18px;text-align:center"><div style="font-size:12px;opacity:.85">Pago confirmado</div><div style="font-size:24px;font-weight:800">${fmt(v.totalPagar)}</div></div>
