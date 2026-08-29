@@ -1,0 +1,111 @@
+# INSTRUCCIONES — Configuración paso a paso
+
+Este sistema funciona 100% con GitHub Pages + Google Sheets (sin servidor).
+Solo tenés que hacer UNA VEZ estos pasos. Después queda funcionando.
+
+=====================================================================
+PARTE 1: CREAR LA BASE DE DATOS EN GOOGLE SHEETS + APPS SCRIPT
+=====================================================================
+
+1) Abrí tu Google Drive (https://drive.google.com)
+2) Clic en "Nuevo" -> "Hoja de cálculo de Google" (Google Sheets)
+3) Renombrala: "MenuDigital" (doble clic arriba a la izquierda)
+4) Cerrá la pestaña de la hoja y volvé a abrirla (o cualquier clic está ok)
+
+5) Menú de arriba: Extensiones -> Apps Script (Aparece el editor de scripts)
+6) Borrá todo el código que venga de ejemplo (si hay).
+7) Pegá TODO el contenido del archivo  Code.gs  (que tenés en este proyecto)
+8) En el editor: "Implementar" (botón azul arriba a la derecha)
+   -> "Nueva implementación"
+9) Tipo de implementación: "Aplicación web" (Web app)
+10) Configurá:
+    - "Ejecutar como":  Yo (tu cuenta de Google)
+    - "Quién tiene acceso":  Cualquier usuario (o "Cualquier usuario con
+      acceso al link" está bien si marcás Anonymous)
+11) Clic en "Implementar".
+    Te va a pedir autorizar permisos: aceptá y confirmá (avanzado -> no seguro)
+12) Copiá la URL que te muestra, termina en  /exec
+    (ej: https://script.google.com/macros/s/ABCDEFG/exec)
+    GUARDALA, la necesitás en la Parte 3.
+
+NOTA: Si Google dice "implementación actualizada", podés volver a
+"Implementar" -> "Administrar implementaciones" -> lápiz -> nueva versión.
+
+=====================================================================
+PARTE 2: CREAR CLAVE GRATUITA DE IMGBB (para las fotos)
+=====================================================================
+
+1) Andá a https://api.imgbb.com
+2) Clic en "Get API Key" (gratis)
+3) Crea tu cuenta y copiá tu API KEY (una cadena larga de caracteres)
+4) Guardala para la Parte 3.
+
+=====================================================================
+PARTE 3: PONER LOS DATOS EN config.js
+=====================================================================
+
+1) En la carpeta  github-pages  abrí el archivo  config.js
+2) En la línea  API_URL = ''   poné la URL que copiaste en la Parte 1,
+   entre comillas. Ejemplo:
+       var API_URL = 'https://script.google.com/macros/s/ABCDEFG/exec';
+3) En IMGBB_KEY = ''  poné tu clave de imgbb. Ejemplo:
+       var IMGBB_KEY = '1234567890abcdef';
+4) Verificá que WPP_ADMIN = '5491164673729' sea tu número correcto.
+5) Guardá el archivo.
+
+=====================================================================
+PARTE 4: SUBIR A GITHUB Y ACTIVAR GITHUB PAGES
+=====================================================================
+
+1) Creá un repositorio nuevo en GitHub (https://github.com/new)
+   Nombre:  menu-digital   (privado o público, como prefieras)
+   NO marques "Add a README".
+
+2) Subí los archivos (Add file -> Upload files):
+   -  config.js
+   -  la carpeta  cliente/   (contiene index.html)
+   -  la carpeta  admin/     (contiene index.html)
+   -  Code.gs  (referencia, aunque ya lo pegaste en Apps Script)
+   -  INSTRUCCIONES.txt  (opcional)
+
+   ESTRUCTURA FINAL en GitHub:
+       menu-digital/
+         config.js
+         cliente/index.html
+         admin/index.html
+         Code.gs
+3) Commit changes.
+
+4) Activar GitHub Pages:
+   - En el repo: Settings -> Pages (menú izquierdo, sección "Code and automation")
+   - Source: Deploy from a branch
+   - Branch: main  /  "(root)"   -> Save
+   - Esperá 1-2 minutos y te da una URL:  https://TU-USUARIO.github.io/menu-digital/
+
+5) Tus páginas quedan en:
+   - Cliente:   https://TU-USUARIO.github.io/menu-digital/cliente/
+   - Admin:     https://TU-USUARIO.github.io/menu-digital/admin/
+
+6) Para crear el QR: apuntalo a la URL del cliente (paso anterior).
+   Podés usar cualquier generador de QR gratis en internet.
+
+=====================================================================
+USO
+=====================================================================
+- Cliente: elige producto y cantidad, paga (sube captura o marca "ya pagué")
+- Admin: entrá a la URL /admin, te llega alerta con sonido de pedido nuevo,
+  podés cambiar estados (pendiente->en preparación->entregado),
+  ver capturas, confirmar pago, y ver el resumen de ventas.
+- Para agregar productos con foto: Admin -> Menú -> "+ Nuevo producto".
+
+=====================================================================
+NOTAS IMPORTANTES
+=====================================================================
+- La primera vez que el cliente o el admin usen la web, la planilla se
+  llena sola con las pestañas (Menu, Pedidos, Config).
+- Podés editar/cargar los productos y categorías directo en la pestaña
+  "Menu" de tu Google Sheet si preferís (columnas: id, categoria, nombre,
+  descripcion, precio, imagen, disponible). La web los leerá.
+- El resumen de ventas cuenta solo los pedidos marcados como "entregado".
+- Para que las fotos duren: imgbb te sube las imágenes a la nube; la URL
+  de la imagen va en la columna "imagen". Podés usar cualquier URL de imagen.

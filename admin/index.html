@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de Cocina</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0efe9; color: #222; }
+  header { background: #1f2a1f; color: #fff; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+  header h1 { font-size: 20px; }
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tabs button { background: #2f3a2f; color: #fff; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  .tabs button.active { background: #ffb703; color: #1f2a1f; font-weight: 700; }
+  .tabs button .count { background: #c0392b; color: #fff; border-radius: 50%; padding: 1px 7px; font-size: 12px; margin-left: 4px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; padding: 20px; max-width: 1400px; margin: 0 auto; }
+  .card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.08); border-left: 5px solid #ffb703; }
+  .card.entregado { border-left-color: #2ecc71; }
+  .card.cancelado { border-left-color: #c0392b; opacity: .7; }
+  .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .numero { font-size: 18px; font-weight: 800; }
+  .hora { font-size: 12px; color: #999; }
+  .cliente { font-size: 14px; color: #555; margin-bottom: 8px; }
+  .items ul { list-style: none; margin-bottom: 10px; }
+  .items li { font-size: 14px; padding: 3px 0; border-bottom: 1px dashed #eee; }
+  .total { font-weight: 800; font-size: 16px; margin-bottom: 10px; }
+  .metodo { font-size: 13px; color: #666; margin-bottom: 8px; }
+  .captura { margin-bottom: 10px; }
+  .captura a { font-size: 13px; color: #1f6feb; }
+  .pago { font-size: 13px; margin-bottom: 10px; }
+  .pago.ok { color: #27ae60; font-weight: 700; }
+  .pago.no { color: #c0392b; }
+  .acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+  .acciones button { flex: 1; border: none; padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 12px; }
+  .btn-wpp { background: #25d366; color: #fff; }
+  .btn-prep { background: #f39c12; color: #fff; }
+  .btn-entregar { background: #2ecc71; color: #fff; }
+  .btn-cancelar { background: #e74c3c; color: #fff; }
+  .btn-pago { background: #3498db; color: #fff; }
+  .vacio { text-align: center; color: #888; padding: 60px 20px; grid-column: 1/-1; font-size: 18px; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1f2a1f; color: #fff; padding: 12px 24px; border-radius: 8px; display: none; z-index: 100; }
+  .toast.show { display: block; }
+  .admin-tab { display: none; padding: 20px; max-width: 800px; margin: 0 auto; }
+  .admin-tab.show { display: block; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid #eee; text-align: left; font-size: 13px; }
+  th { background: #f5f5f5; }
+  .btn-editar { background: #7f8c8d; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 4px; }
+  .error-box { background: #e74c3c; color: #fff; padding: 16px; border-radius: 10px; margin: 20px; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🛎️ Panel de Cocina</h1>
+  <div class="tabs">
+    <button id="tab-pendientes" class="active" onclick="mostrarTab('pendientes')">Pendientes<span class="count" id="count-pendientes">0</span></button>
+    <button id="tab-entregados" onclick="mostrarTab('entregados')">Entregados<span class="count" id="count-entregados">0</span></button>
+    <button id="tab-menu" onclick="mostrarTab('menu')">Menú</button>
+    <button id="tab-ventas" onclick="mostrarTab('ventas')">📊 Ventas</button>
+  </div>
+</header>
+
+<div class="error-box" id="error-box" style="display:none"></div>
+<div class="grid" id="grid-pendientes"></div>
+<div class="grid" id="grid-entregados" style="display:none"></div>
+
+<div class="admin-tab" id="tab-ventas-panel">
+  <h2 style="margin-bottom:12px">Resumen de Ventas</h2>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px">
+    <button class="btn-editar" style="background:#1f2a1f" onclick="cargarVentas('hoy')">Hoy</button>
+    <button class="btn-editar" style="background:#1f2a1f" onclick="cargarVentas('ayer')">Ayer</button>
+    <input type="date" id="desde-venta" style="width:auto">
+    <span style="font-size:13px;color:#666">hasta</span>
+    <input type="date" id="hasta-venta" style="width:auto">
+    <button class="btn-editar" style="background:#1f6feb" onclick="cargarVentas('rango')">Mostrar rango</button>
+  </div>
+  <div id="ventas-contenido"></div>
+</div>
+
+<div class="admin-tab" id="tab-menu-panel">
+  <h2 style="margin-bottom:12px">Gestionar Menú</h2>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+    <button class="btn-editar" style="background:#1f6feb;font-size:14px;padding:10px 18px" onclick="addProducto()">+ Nuevo producto</button>
+    <button class="btn-editar" style="font-size:14px;padding:10px 18px" onclick="addCategoria()">+ Nueva categoría</button>
+  </div>
+  <div id="admin-menu"></div>
+</div>
+
+<!-- Modal formulario producto -->
+<div class="overlay" id="overlay-prod" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:60; justify-content:center; align-items:center; padding:16px;">
+  <div class="modal-prod" style="background:#fff; border-radius:14px; width:100%; max-width:420px; padding:22px;">
+    <h2 id="prod-titulo" style="margin-bottom:14px">Nuevo producto</h2>
+    <label>Nombre *</label><input id="f-nombre" placeholder="Ej: Pizza Muzzarella">
+    <label>Precio *</label><input id="f-precio" type="number" step="0.01" placeholder="9000">
+    <label>Descripción</label><input id="f-desc" placeholder="Ej: Muzzarella, salsa">
+    <label>Categoría (escribí una ya existente o una nueva)</label><input id="f-cat" list="lista-cats" placeholder="Ej: Pizzas">
+    <datalist id="lista-cats"></datalist>
+    <label>Imagen del producto</label><input id="f-imagen" type="file" accept="image/*">
+    <div id="f-img-prev" style="margin-top:8px"></div>
+    <label style="margin-top:8px"><input type="checkbox" id="f-disp" checked> Visible en el menú</label>
+    <div style="display:flex;gap:8px;margin-top:18px">
+      <button class="btn-editar" style="flex:1; background:#e74c3c; font-size:14px; padding:11px" onclick="cerrarProdForm()">Cancelar</button>
+      <button class="btn-editar" style="flex:1; background:#27ae60; font-size:14px; padding:11px; color:#fff" onclick="guardarProducto()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="../config.js"></script>
+<script>
+const fmt = n => '$' + Math.round(n).toLocaleString('es-AR');
+let pedidos = [];
+let menuData = [];
+let editandoId = null;
+let ultimoIdMax = 0;
+let sonidoActivado = false;
+let negocio = 'Mi Negocio';
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!API_URL) {
+    document.getElementById('error-box').style.display = 'block';
+    document.getElementById('error-box').textContent = 'Falta configurar API_URL en config.js (ver INSTRUCCIONES.txt)';
+    return;
+  }
+  document.addEventListener('click', () => { sonidoActivado = true; }, { once: true });
+  try {
+    const cfg = await apiGet('accion=config');
+    if (cfg.data && cfg.data.negocio) negocio = cfg.data.negocio;
+  } catch(e) {}
+  cargarDatos();
+  setInterval(cargarDatos, 12000);
+  setInterval(cargarAdminMenu, 30000);
+});
+
+async function apiGet(query) {
+  const res = await fetch(API_URL + (API_URL.indexOf('?')>=0?'&':'?') + query);
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || 'error API');
+  return json;
+}
+async function apiPost(obj) {
+  const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(obj) });
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || 'error API');
+  return json;
+}
+
+async function cargarDatos() {
+  try {
+    const p = await apiGet('accion=pedidos');
+    pedidos = p.data;
+    renderPendientes(); renderEntregados(); actualizarContadores();
+    const pendMax = pedidos.filter(x=>x.estado==='pendiente'||x.estado==='en_preparacion').reduce((m,x)=>Math.max(m,Number(x.id)||0),0);
+    if (ultimoIdMax !== 0 && pendMax > ultimoIdMax) newPedido();
+    ultimoIdMax = pendMax;
+  } catch(e) {
+    document.getElementById('error-box').style.display = 'block';
+    document.getElementById('error-box').textContent = 'Error conectando a la base: ' + e.message;
+  }
+}
+
+function newPedido() {
+  const t = document.getElementById('toast');
+  t.textContent = '🔔 ¡Nuevo pedido recibido!'; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 5000);
+  if (sonidoActivado) {
+    try {
+      const ctx = new (window.AudioContext||window.webkitAudioContext)();
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = 880; gain.gain.value = 0.3; osc.start();
+      setTimeout(()=>{ osc.stop(); ctx.close(); }, 300);
+    } catch(e){}
+  }
+}
+
+function mostrarTab(tab) {
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.getElementById('grid-pendientes').style.display = tab==='pendientes'?'grid':'none';
+  document.getElementById('grid-entregados').style.display = tab==='entregados'?'grid':'none';
+  document.getElementById('tab-menu-panel').classList.toggle('show', tab==='menu');
+  document.getElementById('tab-ventas-panel').classList.toggle('show', tab==='ventas');
+  if (tab==='ventas') cargarVentas('hoy');
+  if (tab==='menu') cargarAdminMenu();
+}
+function actualizarContadores() {
+  const nP = pedidos.filter(p=>p.estado==='pendiente'||p.estado==='en_preparacion').length;
+  const nE = pedidos.filter(p=>p.estado==='entregado'||p.estado==='cancelado').length;
+  document.getElementById('count-pendientes').textContent = nP;
+  document.getElementById('count-entregados').textContent = nE;
+}
+function parseItems(it) { try { return JSON.parse(it); } catch(e){ return []; } }
+
+function cardHTML(p) {
+  const items = parseItems(p.items);
+  const lista = items.map(i=>`<li>${i.cantidad}× ${i.nombre}</li>`).join('');
+  const esPend = p.estado==='pendiente'||p.estado==='en_preparacion';
+  const detalle = items.map(i=>`${i.cantidad}x ${i.nombre}`).join('\n');
+  const msg = `*Nuevo pedido N°${p.numero}*%0A${p.nombre?('*Cliente:* '+p.nombre+'%0A'):''}%0A${detalle}%0A%0A*Total:* ${fmt(p.total)}%0A*Pago:* ${p.pago_metodo}${p.pago_captura?('%0A*Captura:* '+p.pago_captura):''}`;
+  const wpp = `https://wa.me/${WPP_ADMIN}?text=${msg}`;
+  return `
+  <div class="card ${p.estado}">
+    <div class="card-head"><span class="numero">Pedido N°${p.numero}</span><span class="hora">${p.creado_en||''}</span></div>
+    <div class="cliente">${p.nombre ? '<b>'+p.nombre+'</b> · ' : ''}${p.telefono ? '<a href="https://wa.me/'+p.telefono.replace(/\D/g,'')+'">Tel</a>' : ''}</div>
+    <div class="items"><ul>${lista}</ul></div>
+    <div class="total">Total: ${fmt(p.total)}</div>
+    <div class="metodo">Pago: ${p.pago_metodo||'-'}</div>
+    ${p.pago_captura ? `<div class="captura"><a href="${p.pago_captura}" target="_blank">🔗 Ver captura de pago</a></div>`:''}
+    <div class="pago ${p.pago_confirmado?'ok':'no'}">💳 ${p.pago_confirmado?'Pago confirmado':'Pago sin confirmar'}</div>
+    <div class="acciones">
+      <button class="btn-wpp" onclick="window.open('${wpp}','_blank')">📲 WhatsApp</button>
+      ${esPend ? `<button class="btn-prep" onclick="cambiarEstado(${p.id},'en_preparacion')">En preparación</button>`:''}
+      <button class="btn-pago" onclick="togglePago(${p.id}, ${p.pago_confirmado?0:1})">${p.pago_confirmado?'Desconfirmar':'Confirmar pago'}</button>
+      <button class="btn-entregar" onclick="cambiarEstado(${p.id},'entregado')">✓ Entregado</button>
+      <button class="btn-cancelar" onclick="cambiarEstado(${p.id},'cancelado')">✗</button>
+    </div>
+  </div>`;
+}
+function renderPendientes() {
+  const cont = document.getElementById('grid-pendientes');
+  const l = pedidos.filter(p=>p.estado==='pendiente'||p.estado==='en_preparacion').sort((a,b)=>a.id-b.id);
+  cont.innerHTML = l.length ? l.map(cardHTML).join('') : '<div class="vacio">No hay pedidos pendientes 🎉</div>';
+}
+function renderEntregados() {
+  const cont = document.getElementById('grid-entregados');
+  const l = pedidos.filter(p=>p.estado==='entregado'||p.estado==='cancelado').sort((a,b)=>b.id-a.id);
+  cont.innerHTML = l.length ? l.map(cardHTML).join('') : '<div class="vacio">Aún no hay entregados</div>';
+}
+async function cambiarEstado(id, estado) {
+  await apiPost({ accion:'estado_pedido', id, estado });
+  cargarDatos();
+}
+async function togglePago(id, val) {
+  await apiPost({ accion:'estado_pedido', id, pago_confirmado: val });
+  cargarDatos();
+}
+
+// ---------- Ventas ----------
+function cargarVentas(modo) {
+  const d = new Date(); const fmtD = x => x.toISOString().slice(0,10);
+  let q = 'accion=resumen';
+  if (modo==='ayer') { const a=new Date(d); a.setDate(d.getDate()-1); q += '&fecha='+fmtD(a); }
+  else if (modo==='rango') { q += '&desde='+(document.getElementById('desde-venta').value||fmtD(d))+'&hasta='+(document.getElementById('hasta-venta').value||fmtD(d)); }
+  apiGet(q).then(r=>renderVentas(r.data));
+}
+function renderVentas(v) {
+  const cont = document.getElementById('ventas-contenido');
+  const porMetodo = (v.porMetodo||[]).map(m=>`<div style="display:flex;justify-content:space-between;border-bottom:1px dashed #eee;padding:6px 0"><span>${m.metodo}</span><b>${fmt(m.monto)}</b></div>`).join('');
+  const prods = (v.porProducto||[]).map(p=>`<div style="display:flex;justify-content:space-between;border-bottom:1px dashed #eee;padding:6px 0"><span>${p.nombre} × ${p.cantidad}</span><b>${fmt(p.monto)}</b></div>`).join('')||'<div class="vacio">Sin ventas</div>';
+  cont.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px">
+      <div style="background:#1f2a1f;color:#fff;border-radius:12px;padding:18px;text-align:center"><div style="font-size:12px;opacity:.7">Total vendido</div><div style="font-size:26px;font-weight:800">${fmt(v.totalGeneral)}</div><div style="font-size:12px">${v.pedidosTotales} pedidos · ${v.itemsVendidos} ítems</div></div>
+      <div style="background:#27ae60;color:#fff;border-radius:12px;padding:18px;text-align:center"><div style="font-size:12px;opacity:.85">Pago confirmado</div><div style="font-size:24px;font-weight:800">${fmt(v.totalPagar)}</div></div>
+      <div style="background:#c0392b;color:#fff;border-radius:12px;padding:18px;text-align:center"><div style="font-size:12px;opacity:.85">Sin confirmar</div><div style="font-size:24px;font-weight:800">${fmt(v.totalSinPagar)}</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:640px">
+      <div style="background:#fff;border-radius:10px;padding:14px"><h3 style="font-size:15px;margin-bottom:8px">Por producto</h3>${prods}</div>
+      <div style="background:#fff;border-radius:10px;padding:14px"><h3 style="font-size:15px;margin-bottom:8px">Por método</h3>${porMetodo||'<div class="vacio">Sin datos</div>'}</div>
+    </div>`;
+}
+
+// ---------- Gestion de menu ----------
+async function cargarAdminMenu() {
+  try {
+    const m = await apiGet('accion=menu');
+    menuData = m.data;
+    renderAdminMenu();
+    const dl = document.getElementById('lista-cats');
+    dl.innerHTML = menuData.map(c=>`<option value="${c.nombre}">`).join('');
+  } catch(e){}
+}
+function renderAdminMenu() {
+  const cont = document.getElementById('admin-menu');
+  let html = '';
+  menuData.forEach(cat=>{
+    html += `<h3 style="margin:16px 0 6px">${cat.nombre} <button class="btn-editar" style="background:#c0392b" onclick="borrarCategoria('${cat.nombre.replace(/'/g,"\\'")}')">🗑 cat.</button></h3>`;
+    cat.productos.forEach(p=>{
+      html += `<div style="background:#fff;padding:10px;border-radius:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0">
+          ${p.imagen?`<img src="${p.imagen}" style="width:42px;height:42px;border-radius:8px;object-fit:cover;flex-shrink:0">`:''}
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.nombre} — ${fmt(p.precio)} ${p.disponible?'':'· <b>Oculto</b>'}</span>
+        </div>
+        <span style="flex-shrink:0">
+          <button class="btn-editar" onclick="toggleDisponible(${p.id},${p.disponible?0:1})">${p.disponible?'Ocultar':'Mostrar'}</button>
+          <button class="btn-editar" onclick="editarProducto(${p.id})">Editar</button>
+          <button class="btn-editar" style="background:#e74c3c" onclick="borrarProducto(${p.id})">🗑</button>
+        </span>
+      </div>`;
+    });
+  });
+  cont.innerHTML = html;
+}
+function addProducto(){
+  editandoId = null;
+  document.getElementById('prod-titulo').textContent='Nuevo producto';
+  ['f-nombre','f-precio','f-desc','f-cat','f-imagen'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('f-img-prev').innerHTML=''; document.getElementById('f-disp').checked=true;
+  document.getElementById('overlay-prod').style.display='flex';
+}
+function editarProducto(id){
+  const p = menuData.flatMap(c=>c.productos).find(x=>x.id==id); if(!p) return;
+  editandoId = id;
+  document.getElementById('prod-titulo').textContent='Editar: '+p.nombre;
+  document.getElementById('f-nombre').value=p.nombre;
+  document.getElementById('f-precio').value=p.precio;
+  document.getElementById('f-desc').value=p.descripcion||'';
+  document.getElementById('f-cat').value=p.categoria;
+  document.getElementById('f-imagen').value='';
+  document.getElementById('f-img-prev').innerHTML=p.imagen?`<img src="${p.imagen}" style="width:60px;height:60px;border-radius:8px;object-fit:cover"><p style="font-size:12px;color:#666;margin:4px 0 0">Imagen actual. Subí una nueva para reemplazar.</p>`:'';
+  document.getElementById('f-disp').checked=!!p.disponible;
+  document.getElementById('overlay-prod').style.display='flex';
+}
+function cerrarProdForm(){ document.getElementById('overlay-prod').style.display='none'; }
+async function guardarProducto(){
+  const nombre=document.getElementById('f-nombre').value.trim();
+  const precio=parseFloat(document.getElementById('f-precio').value);
+  const desc=document.getElementById('f-desc').value.trim();
+  const cat=document.getElementById('f-cat').value.trim();
+  const disp=document.getElementById('f-disp').checked?1:0;
+  const file=document.getElementById('f-imagen').files[0];
+  if(!nombre||!cat||isNaN(precio)){ alert('Completá nombre, precio y categoría'); return; }
+  let imagen = editandoId ? (menuData.flatMap(c=>c.productos).find(x=>x.id==editandoId)||{}).imagen : null;
+  if (file) { imagen = await subirImagen(file); if(!imagen){ alert('No se pudo subir la imagen (falta IMGBB_KEY en config.js)'); } }
+  await apiPost({ accion:'guardar_producto', id: editandoId, nombre, precio, descripcion: desc, categoria: cat, imagen, disponible: disp });
+  cerrarProdForm(); cargarAdminMenu();
+}
+async function toggleDisponible(id,val){
+  const p = menuData.flatMap(c=>c.productos).find(x=>x.id==id);
+  await apiPost({ accion:'guardar_producto', id, nombre:p.nombre, categoria:p.categoria, descripcion:p.descripcion, precio:p.precio, imagen:p.imagen, disponible:val });
+  cargarAdminMenu();
+}
+async function borrarProducto(id){ if(!confirm('¿Borrar producto?')) return; await apiPost({accion:'borrar_producto', id}); cargarAdminMenu(); }
+function addCategoria(){ prompt('Escribí el nombre de la nueva categoría y luego creá su primer producto:\n\nForma: anotá el nombre, tocá OK, y usá "+ Nuevo producto" con esa categoría.'); }
+async function borrarCategoria(nombre){
+  if(!confirm('¿Borrar la categoría "'+nombre+'" y todos sus productos?')) return;
+  const prods = menuData.filter(c=>c.nombre===nombre).flatMap(c=>c.productos);
+  for (const p of prods) await apiPost({accion:'borrar_producto', id:p.id});
+  cargarAdminMenu();
+}
+
+async function subirImagen(file){
+  if(!IMGBB_KEY) return null;
+  const fd=new FormData(); fd.append('image', file);
+  const res=await fetch('https://api.imgbb.com/1/upload?key='+IMGBB_KEY,{method:'POST',body:fd});
+  const json=await res.json();
+  return json.data?json.data.url:null;
+}
+</script>
+</body>
+</html>

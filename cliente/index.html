@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Menú</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f5f1ea; color: #1f1f1f; }
+  header { background: #1f2a1f; color: #fff; padding: 24px 20px; text-align: center; }
+  header h1 { font-size: 28px; margin-bottom: 4px; }
+  header p { opacity: .8; }
+  .nav { position: sticky; top: 0; background: #fff; display: flex; overflow-x: auto; gap: 8px; padding: 10px; box-shadow: 0 2px 6px rgba(0,0,0,.08); z-index: 5; }
+  .nav button { border: 1px solid #ddd; background: #fff; padding: 8px 14px; border-radius: 20px; cursor: pointer; white-space: nowrap; font-size: 14px; }
+  .nav button.active { background: #1f2a1f; color: #fff; border-color: #1f2a1f; }
+  .content { max-width: 640px; margin: 0 auto; padding: 20px 16px 120px; }
+  .cat-titulo { font-size: 22px; margin: 24px 0 12px; color: #1f2a1f; }
+  .productos-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .producto { display: flex; flex-direction: column; gap: 8px; background: #fff; border-radius: 12px; padding: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .producto img { width: 100%; height: 110px; border-radius: 10px; object-fit: cover; background: #eee; }
+  .prod-img-place { width: 100%; height: 110px; border-radius: 10px; background: #e8e4dc; display: flex; align-items: center; justify-content: center; font-size: 34px; }
+  .producto .info { flex: 1; display: flex; flex-direction: column; }
+  .producto h3 { font-size: 15px; }
+  .producto p { font-size: 12px; color: #666; margin: 2px 0 8px; flex: 1; }
+  .producto .prod-foot { display: flex; justify-content: space-between; align-items: center; }
+  .producto .precio { font-weight: 700; color: #1f2a1f; }
+  .producto .add { background: #1f2a1f; color: #fff; border: none; border-radius: 8px; width: 32px; height: 32px; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  @media (max-width: 400px) { .productos-grid { grid-template-columns: 1fr; } }
+  .carrito-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #1f2a1f; color: #fff; padding: 14px 20px; display: none; justify-content: space-between; align-items: center; }
+  .carrito-bar.show { display: flex; }
+  .carrito-bar .ver { background: #ffb703; color: #1f2a1f; border: none; padding: 10px 22px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 50; justify-content: center; align-items: center; padding: 16px; }
+  .overlay.show { display: flex; }
+  .modal { background: #fff; border-radius: 14px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; padding: 22px; }
+  .modal h2 { margin-bottom: 16px; }
+  .carrito-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
+  .carrito-item .ctrl button { background: #eee; border: none; border-radius: 6px; width: 26px; height: 26px; cursor: pointer; font-weight: 700; }
+  .carrito-item .cant { margin: 0 10px; }
+  .total { display: flex; justify-content: space-between; font-size: 18px; font-weight: 700; margin: 16px 0; }
+  label { display: block; font-size: 13px; color: #666; margin: 10px 0 4px; }
+  input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; }
+  .pago-opts { display: flex; flex-direction: column; gap: 8px; }
+  .pago-opts label { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #1f1f1f; margin: 0; }
+  .btn { width: 100%; background: #1f2a1f; color: #fff; border: none; padding: 14px; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 16px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .nota { font-size: 12px; color: #999; margin-top: 4px; }
+  .error-box { background: #e74c3c; color: #fff; padding: 16px; border-radius: 10px; margin: 20px 16px; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="negocio-nombre">Cargando...</h1>
+  <p>Escaneá el QR, elegí y pedi. ¡Gracias!</p>
+</header>
+
+<div class="nav" id="nav"></div>
+<main class="content" id="contenido"></main>
+<div class="error-box" id="error-box" style="display:none"></div>
+
+<div class="carrito-bar" id="carrito-bar">
+  <span id="bar-total">0 ítems</span>
+  <button class="ver" onclick="abrirCarrito()">Ver carrito</button>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2>Tu pedido</h2>
+    <div id="carrito-items"></div>
+    <div class="total"><span>Total</span><span id="total">$0</span></div>
+    <hr>
+    <label>Tu nombre</label>
+    <input id="cli-nombre" placeholder="Nombre">
+    <label>Tu teléfono (opcional)</label>
+    <input id="cli-telefono" placeholder="Ej: 1122334455">
+    <label>Notas para la cocina (opcional)</label>
+    <textarea id="cli-nota" rows="2" placeholder="Ej: sin cebolla"></textarea>
+    <label>Método de pago</label>
+    <div class="pago-opts">
+      <label><input type="radio" name="pago" value="transferencia" checked> Transferencia / Depósito</label>
+      <label><input type="radio" name="pago" value="efectivo"> Efectivo al recibir</label>
+    </div>
+    <div id="pago-captura-box">
+      <label>Subí la captura del pago</label>
+      <input type="file" id="cli-captura" accept="image/*">
+      <p class="nota">O marcá que ya pagaste más abajo.</p>
+      <label><input type="checkbox" id="cli-ya-pago" style="width:auto"> Ya realicé el pago</label>
+      <div id="estado-archivo" class="nota"></div>
+    </div>
+    <button class="btn" id="btn-pedido" onclick="enviarPedido()">Enviar pedido</button>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-exito">
+  <div class="modal" style="text-align:center">
+    <h2>¡Pedido enviado!</h2>
+    <p id="exito-msg">Tu pedido fue registrado.</p>
+    <button class="btn" onclick="location.reload()">Volver al menú</button>
+  </div>
+</div>
+
+<script src="../config.js"></script>
+<script>
+let menu = [];
+let carrito = {};
+let negocio = 'Menú';
+let archivoCaptura = null;
+
+const fmt = n => '$' + Math.round(n).toLocaleString('es-AR');
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (!API_URL) {
+    document.getElementById('error-box').style.display = 'block';
+    document.getElementById('error-box').textContent = 'Configuración incompleta: hay que poner la API_URL en config.js (ver INSTRUCCIONES.txt)';
+    return;
+  }
+  try {
+    const cfg = await apiGet('accion=config');
+    if (cfg.data && cfg.data.negocio) negocio = cfg.data.negocio;
+    document.getElementById('negocio-nombre').textContent = negocio;
+    const m = await apiGet('accion=menu');
+    menu = m.data;
+    renderNav(); renderMenu();
+  } catch(e) {
+    document.getElementById('error-box').style.display = 'block';
+    document.getElementById('error-box').textContent = 'No se pudo conectar con la base de datos: ' + e.message;
+  }
+});
+
+async function apiGet(query) {
+  if (!API_URL) throw new Error('API_URL vacía');
+  const res = await fetch(API_URL + (API_URL.indexOf('?')>=0?'&':'?') + query);
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || 'error API');
+  return json;
+}
+async function apiPost(obj) {
+  const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(obj) });
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || 'error API');
+  return json;
+}
+
+function renderNav() {
+  const nav = document.getElementById('nav');
+  let h = `<button class="active" data-id="todo" onclick="irCategoria('todo')">Todo</button>`;
+  menu.forEach(c => { h += `<button data-id="${c.nombre}" onclick="irCategoria(this.dataset.id)">${c.nombre}</button>`; });
+  nav.innerHTML = h;
+}
+function irCategoria(id) {
+  document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('active', b.dataset.id === id));
+  renderMenu(id);
+}
+function renderMenu(filtro) {
+  const cont = document.getElementById('contenido');
+  let html = '';
+  menu.forEach(cat => {
+    if (filtro && cat.nombre !== filtro) return;
+    html += `<h2 class="cat-titulo">${cat.nombre}</h2><div class="productos-grid">`;
+    cat.productos.forEach(p => {
+      html += `
+        <div class="producto">
+          ${p.imagen ? `<img src="${p.imagen}" alt="">` : `<div class="prod-img-place">🍽️</div>`}
+          <div class="info">
+            <h3>${p.nombre}</h3>
+            <p>${p.descripcion || ''}</p>
+            <div class="prod-foot">
+              <span class="precio">${fmt(p.precio)}</span>
+              <button class="add" onclick="agregar(${p.id})">+</button>
+            </div>
+          </div>
+        </div>`;
+    });
+    html += `</div>`;
+  });
+  cont.innerHTML = html;
+}
+function agregar(id) { carrito[id] = (carrito[id]||0)+1; renderCarritoBar(); }
+function totalPedido() {
+  return Object.entries(carrito).reduce((acc, [id, cant]) => {
+    const p = menu.flatMap(c=>c.productos).find(x=>x.id==id);
+    return acc + (p ? p.precio*cant : 0);
+  }, 0);
+}
+function renderCarritoBar() {
+  const n = Object.values(carrito).reduce((a,b)=>a+b,0);
+  document.getElementById('bar-total').textContent = `${n} ítems · ${fmt(totalPedido())}`;
+  document.getElementById('carrito-bar').classList.toggle('show', n > 0);
+}
+function abrirCarrito() {
+  const cont = document.getElementById('carrito-items'); cont.innerHTML = '';
+  for (const [id,cant] of Object.entries(carrito)) {
+    const p = menu.flatMap(c=>c.productos).find(x=>x.id==id); if(!p) continue;
+    cont.innerHTML += `<div class="carrito-item"><span>${p.nombre}</span><span class="ctrl"><button onclick="cambiarCant(${id},-1)">−</button><span class="cant">${cant}</span><button onclick="cambiarCant(${id},1)">+</button></span><span>${fmt(p.precio*cant)}</span></div>`;
+  }
+  document.getElementById('total').textContent = fmt(totalPedido());
+  document.getElementById('btn-pedido').disabled = Object.keys(carrito).length === 0;
+  document.getElementById('overlay').classList.add('show');
+}
+function cambiarCant(id, d) {
+  carrito[id] = (carrito[id]||0)+d;
+  if (carrito[id] <= 0) delete carrito[id];
+  if (Object.keys(carrito).length === 0) { document.getElementById('overlay').classList.remove('show'); renderCarritoBar(); return; }
+  abrirCarrito(); renderCarritoBar();
+}
+document.getElementById('cli-captura').addEventListener('change', function(){
+  const f = this.files[0];
+  if (f) {
+    archivoCaptura = f;
+    document.getElementById('estado-archivo').textContent = '📎 ' + f.name + ' (' + Math.round(f.size/1024) + ' KB)';
+  }
+});
+
+async function enviarPedido() {
+  const items = Object.entries(carrito).map(([id,cant]) => {
+    const p = menu.flatMap(c=>c.productos).find(x=>x.id==id);
+    return { id: p.id, nombre: p.nombre, cantidad: cant, precio: p.precio, subtotal: p.precio*cant };
+  });
+  const metodo = document.querySelector('input[name="pago"]:checked').value;
+  const yaPago = document.getElementById('cli-ya-pago').checked;
+
+  let pago_captura = null;
+  if (metodo === 'transferencia' && archivoCaptura) {
+    const imagen = await subirImagen(archivoCaptura);
+    pago_captura = imagen;
+  }
+
+  try {
+    document.getElementById('btn-pedido').disabled = true;
+    const r = await apiPost({
+      accion: 'crear_pedido',
+      nombre: document.getElementById('cli-nombre').value.trim(),
+      telefono: document.getElementById('cli-telefono').value.trim(),
+      items: items,
+      total: totalPedido(),
+      nota: document.getElementById('cli-nota').value.trim(),
+      pago_metodo: metodo,
+      pago_captura: pago_captura,
+      pago_confirmado: yaPago ? 1 : 0
+    });
+    document.getElementById('overlay').classList.remove('show');
+    document.getElementById('exito-msg').textContent = `Tu pedido N°${r.data.numero} fue recibido. ¡Lo estamos preparando!`;
+    document.getElementById('overlay-exito').classList.add('show');
+  } catch(e) {
+    alert('Error al enviar: ' + e.message);
+    document.getElementById('btn-pedido').disabled = false;
+  }
+}
+
+// Subir captura / imagen por URL a imgbb (gratis, sin servidor)
+async function subirImagen(file) {
+  const key = IMGBB_KEY;
+  if (!key) return null;
+  const fd = new FormData();
+  fd.append('image', file);
+  const res = await fetch('https://api.imgbb.com/1/upload?key=' + key, { method: 'POST', body: fd });
+  const json = await res.json();
+  return json.data ? json.data.url : null;
+}
+</script>
+</body>
+</html>
