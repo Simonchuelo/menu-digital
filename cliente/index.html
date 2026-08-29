@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Menú</title>
+<title>Polybius</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f5f1ea; color: #1f1f1f; }
@@ -49,7 +49,7 @@
 </head>
 <body>
 <header>
-  <h1 id="negocio-nombre">Cargando...</h1>
+  <h1>Polybius</h1>
   <p>Escaneá el QR, elegí y pedi. ¡Gracias!</p>
 </header>
 
@@ -94,6 +94,10 @@
   <div class="modal" style="text-align:center">
     <h2>¡Pedido enviado!</h2>
     <p id="exito-msg">Tu pedido fue registrado.</p>
+    <div id="cancelar-box" style="display:none;margin-top:14px">
+      <p style="font-size:13px;color:#666;margin-bottom:10px">¿Te equivocaste o cambiaste de opinión?</p>
+      <button class="btn" style="background:#e74c3c" id="btn-cancelar-pedido" onclick="cancelarPedido()">Cancelar mi pedido</button>
+    </div>
     <button class="btn" onclick="location.reload()">Volver al menú</button>
   </div>
 </div>
@@ -104,6 +108,7 @@ let menu = [];
 let carrito = {};
 let negocio = 'Menú';
 let archivoCaptura = null;
+let ultimoPedidoId = null;
 
 const fmt = n => '$' + Math.round(n).toLocaleString('es-AR');
 
@@ -114,9 +119,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
   try {
-    const cfg = await apiGet('accion=config');
-    if (cfg.data && cfg.data.negocio) negocio = cfg.data.negocio;
-    document.getElementById('negocio-nombre').textContent = negocio;
     const m = await apiGet('accion=menu');
     menu = m.data;
     renderNav(); renderMenu();
@@ -238,11 +240,30 @@ async function enviarPedido() {
       pago_confirmado: yaPago ? 1 : 0
     });
     document.getElementById('overlay').classList.remove('show');
+    ultimoPedidoId = r.data.id;
     document.getElementById('exito-msg').textContent = `Tu pedido N°${r.data.numero} fue recibido. ¡Lo estamos preparando!`;
+    document.getElementById('cancelar-box').style.display = 'block';
     document.getElementById('overlay-exito').classList.add('show');
   } catch(e) {
     alert('Error al enviar: ' + e.message);
     document.getElementById('btn-pedido').disabled = false;
+  }
+}
+
+async function cancelarPedido() {
+  if (!ultimoPedidoId) return;
+  if (!confirm('¿Seguro que querés cancelar tu pedido?')) return;
+  try {
+    const r = await apiPost({ accion: 'cancelar_pedido', id: ultimoPedidoId });
+    if (r.ok) {
+      document.getElementById('exito-msg').textContent = 'Tu pedido fue cancelado. ¡Gracias por avisarnos!';
+      document.getElementById('cancelar-box').style.display = 'none';
+      document.getElementById('btn-cancelar-pedido').disabled = true;
+    } else {
+      alert(r.error || 'No se pudo cancelar');
+    }
+  } catch(e) {
+    alert('Error: ' + e.message);
   }
 }
 
