@@ -25,6 +25,7 @@
   .items li { font-size: 14px; padding: 3px 0; border-bottom: 1px dashed #eee; }
   .total { font-weight: 800; font-size: 16px; margin-bottom: 10px; }
   .metodo { font-size: 13px; color: #666; margin-bottom: 8px; }
+  .nota { background: #fff8e6; border: 1px solid #f0e0a0; border-radius: 8px; padding: 8px 10px; font-size: 13px; color: #6b5300; margin-bottom: 10px; white-space: pre-wrap; word-break: break-word; }
   .captura { margin-bottom: 10px; }
   .captura a { font-size: 13px; color: #1f6feb; }
   .pago { font-size: 13px; margin-bottom: 10px; }
@@ -238,6 +239,7 @@ function cardHTML(p) {
     <div class="card-head"><span class="numero">Pedido N°${p.id}</span><span class="hora">${p.creado_en||''}</span></div>
     <div class="cliente">${p.nombre ? '<b>'+p.nombre+'</b> · ' : ''}${p.telefono ? '<a href="https://wa.me/'+p.telefono.replace(/\D/g,'')+'">Tel</a>' : ''}</div>
     <div class="items"><ul>${lista}</ul></div>
+    ${p.nota ? `<div class="nota">📝 ${p.nota.replace(/</g,'&lt;')}</div>`:''}
     <div class="total">Total: ${fmt(p.total)}</div>
     <div class="metodo">Pago: ${p.pago_metodo||'-'}</div>
     ${p.pago_captura ? `<div class="captura"><a href="${p.pago_captura}" target="_blank">🔗 Ver captura de pago</a></div>`:''}
